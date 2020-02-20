@@ -1,0 +1,7 @@
+__pycache__/
+.vscode/
+
+.env/
+.openssl/
+.app_cache/
+global_config/protected*

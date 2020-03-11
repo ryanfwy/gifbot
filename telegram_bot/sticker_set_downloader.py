@@ -30,13 +30,13 @@ class StickerSetDownloader():
         command = command % {'tgs': in_file_path, 'json': json_path}
         status = os.system(command)
         if status != 0:
-            os.remove(json_path)
+            os.path.isfile(json_path) and os.remove(json_path)
             raise Exception('tgsconvert.py error: execute .tgs => .json')
 
         command = 'puppeteer-lottie -q -i %(json)s -o %(mp4)s > /dev/null 2>&1'
         command = command % {'json': json_path, 'mp4': out_file_path}
         status = os.system(command)
-        os.remove(json_path)
+        os.path.isfile(json_path) and os.remove(json_path)
         if status != 0:
             raise Exception('puppeteer-lottie error: execute .json => .mp4')
         else:
@@ -83,7 +83,8 @@ class StickerSetDownloader():
         # download and convert
         for sticker in stickers:
             file_id = sticker.file_id
-            self.download_sticker(file_id, save_dir=file_dir, random_name=True)
+            webp_path, _ = self.download_sticker(file_id, save_dir=file_dir, random_name=True)
+            os.path.isfile(webp_path) and os.remove(webp_path)
 
         # zip
         out_path = out_path or file_dir + '.zip'

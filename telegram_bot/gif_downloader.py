@@ -21,13 +21,13 @@ class GifDownloader():
         command = command % {'mp4': in_file_path, 'palette': palette_path}
         status = os.system(command + ' > /dev/null 2>&1')
         if status != 0:
-            os.remove(palette_path)
+            os.path.isfile(palette_path) and os.remove(palette_path)
             raise Exception('ffmpeg error: execute gif => _palette.png')
 
         command = 'ffmpeg -y -i %(mp4)s -i %(palette)s -filter_complex "fps=10,scale=-1:-1:flags=lanczos[x];[x][1:v]paletteuse" %(gif)s'
         command = command % {'mp4': in_file_path, 'palette': palette_path, 'gif': out_file_path}
         status = os.system(command + ' > /dev/null 2>&1')
-        os.remove(palette_path)
+        os.path.isfile(palette_path) and os.remove(palette_path)
         if status != 0:
             raise Exception('ffmpeg error: execute .gif => .mp4')
         else:

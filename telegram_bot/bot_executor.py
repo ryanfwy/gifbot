@@ -19,7 +19,7 @@ from log_helper.msg_logger import MsgLogger
 
 
 STICKER_SET = 'sticker_set'
-LIMITATION = 50 * 1024 * 1024 # 50MB
+LIMITATION = 100 * 1024 * 1024 # 100MB
 LIMITATION_STRING = str(round(LIMITATION/(1024*1024))) + 'MB'
 
 
@@ -62,148 +62,6 @@ def check_usage_limit(func):
     return warpper
 
 
-def base_send_zip(file_name, callback, callback_args,
-                  update=None, context=None, pack_name=None):
-    if not update and not context:
-        return -1
-
-    # language
-    locale = update.effective_user.language_code
-
-    # parse update and context
-    chat = update.effective_chat
-    message = update.effective_message
-
-    file_dir = os.path.join(_temp_dir, file_name)
-    zip_file_path = os.path.join(_temp_dir, file_name+'.zip')
-    if os.path.isfile(zip_file_path):
-        pass
-    elif os.path.isdir(file_dir):
-        message.reply_text(l10n('zip_packing', locale))
-        # wait 10 times, 30 seconds for each
-        for _ in range(10):
-            if not os.path.isfile(zip_file_path):
-                time.sleep(30)
-            else:
-                break
-        else:
-            message.reply_text(l10n('zip_timeout', locale))
-            return -1
-    else:
-        message.reply_text(l10n('zip_preparing', locale))
-        zip_file_path = callback(*callback_args)
-
-    with open(zip_file_path, 'rb') as f:
-        filename = pack_name or file_name
-        chat.send_action('upload_document')
-        chat.send_document(f, filename=filename+'.zip',
-                           reply_to_message_id=message.message_id)
-
-    # count usage
-    set_usage(context, file_path=zip_file_path)
-
-
-@run_async
-def download_sticker_set_async(sticker_set_name, update=None, context=None):
-    if not update and not context:
-        return -1
-
-    # parse update and context
-    callback = download_sticker_set
-    args = (sticker_set_name,)
-    base_send_zip(sticker_set_name, callback, args, update=update, context=context)
-
-@run_async
-def download_gif_pack_async(file_id, update=None, context=None):
-    if not update or not context:
-        return -1
-
-    # parse update and context
-    bot = context.bot
-    gif = bot.get_file(file_id)
-    gif_pack_name = gif.file_path.split('/')[-1].split('.')[0]
-    gif_unique_id = random_string() # gif.file_unique_id
-
-    callback = download_gif_pack
-    args = (gif, gif_pack_name)
-    base_send_zip(gif_pack_name, callback, args,
-                  update=update, context=context, pack_name=gif_unique_id)
-
-
-@run_async
-def download_sticker_animated_async(file_id, update=None, context=None):
-    if not update or not context:
-        return -1
-
-    # parse update and context
-    bot = context.bot
-    sticker = bot.get_file(file_id)
-    sticker_pack_name = sticker.file_path.split('/')[-1].split('.')[0]
-    sticker_unique_id = random_string() # sticker.file_unique_id
-
-    callback = download_sticker_animated_pack
-    args = (sticker, sticker_pack_name)
-    base_send_zip(sticker_pack_name, callback, args,
-                  update=update, context=context, pack_name=sticker_unique_id)
-
-@run_async
-def download_sticker_async(file_id, update=None, context=None):
-    if not update or not context:
-        return -1
-
-    # language
-    locale = update.effective_user.language_code
-
-    # parse update and context
-    bot = context.bot
-    sticker = bot.get_file(file_id)
-    sticker_name = sticker.file_path.split('/')[-1].split('.')[0]
-    sticker_unique_id = random_string() # sticker.file_unique_id
-
-    chat = update.effective_chat
-    message = update.effective_message
-
-    # send action
-    chat.send_action('upload_document')
-
-    # download sticker
-    file_dir = os.path.join(_temp_dir, sticker_name)
-    file_path = os.path.join(_temp_dir, sticker_name, sticker_name+'.png')
-    if os.path.isfile(file_path):
-        pass
-    elif os.path.isdir(file_dir):
-        # wait 10 times, 10 seconds for each
-        for _ in range(10):
-            if not os.path.isfile(file_path):
-                time.sleep(10)
-            else:
-                break
-        else:
-            message.reply_text(l10n('zip_timeout', locale))
-            return -1
-    else:
-        # make dir `sticker_name`
-        os.path.isdir(file_dir) or os.makedirs(file_dir)
-        _, file_path = download_sticker(sticker, save_dir=file_dir)
-
-    # send document
-    sticker_set_name = message.sticker.set_name
-    callback_data = ''.join([STICKER_SET, ':', sticker_set_name])
-    keyboard = InlineKeyboardMarkup(
-        [[
-            InlineKeyboardButton(text=l10n('kb_sticker_set', locale),
-                                 callback_data=callback_data),
-        ]]
-    )
-    with open(file_path, 'rb') as f:
-        chat.send_document(f, reply_markup=keyboard,
-                           filename=sticker_unique_id+'.png',
-                           reply_to_message_id=message.message_id)
-
-    # count usage
-    set_usage(context, file_path=file_path)
-
-
 class BotExecutor():
     def __init__(self,
                  cert_path=None,
@@ -226,6 +84,175 @@ class BotExecutor():
         _dir = os.path.dirname(log_file_path)
         os.path.isdir(_dir) or os.makedirs(_dir)
         self.logger = MsgLogger(log_file=log_file_path).get_logger()
+
+        self.gif_file_size_max = 1 * 1024 * 1024 # 1MB
+
+
+    ''' helper functions '''
+
+    def base_send_zip(self, file_name, callback, callback_args,
+                      update=None, context=None, pack_name=None):
+        if not update and not context:
+            return -1
+
+        # language
+        locale = update.effective_user.language_code
+
+        # parse update and context
+        chat = update.effective_chat
+        message = update.effective_message
+
+        try:
+            file_dir = os.path.join(_temp_dir, file_name)
+            zip_file_path = os.path.join(_temp_dir, file_name+'.zip')
+            if os.path.isfile(zip_file_path):
+                pass
+            elif os.path.isdir(file_dir):
+                message.reply_text(l10n('zip_packing', locale))
+                # wait 10 times, 30 seconds for each
+                for _ in range(10):
+                    if not os.path.isfile(zip_file_path):
+                        time.sleep(30)
+                    else:
+                        break
+                else:
+                    message.reply_text(l10n('zip_timeout', locale))
+                    return -1
+            else:
+                message.reply_text(l10n('zip_preparing', locale))
+                zip_file_path = callback(*callback_args)
+
+            with open(zip_file_path, 'rb') as f:
+                filename = pack_name or file_name
+                chat.send_action('upload_document')
+                chat.send_document(f, filename=filename+'.zip',
+                                reply_to_message_id=message.message_id)
+
+            # count usage
+            set_usage(context, file_path=zip_file_path)
+
+        except Exception as e:
+            message.reply_text(l10n('exec_error', locale))
+            self.logger.error('Exception msg: %s', str(e), exc_info=True)
+
+    @run_async
+    def download_sticker_set_async(self, sticker_set_name, update=None, context=None):
+        if not update and not context:
+            return -1
+
+        # parse update and context
+        callback = download_sticker_set
+        args = (sticker_set_name,)
+        self.base_send_zip(sticker_set_name, callback, args, update=update, context=context)
+
+    @run_async
+    def download_gif_pack_async(self, file_id, update=None, context=None):
+        if not update or not context:
+            return -1
+
+        # language
+        locale = update.effective_user.language_code
+        message = update.effective_message
+
+        try:
+            # parse update and context
+            bot = context.bot
+            gif = bot.get_file(file_id)
+            gif_pack_name = gif.file_path.split('/')[-1].split('.')[0]
+            gif_unique_id = random_string() # gif.file_unique_id
+
+            callback = download_gif_pack
+            args = (gif, gif_pack_name)
+            self.base_send_zip(gif_pack_name, callback, args,
+                            update=update, context=context, pack_name=gif_unique_id)
+
+        except Exception as e:
+            message.reply_text(l10n('exec_error', locale))
+            self.logger.error('Exception msg: %s', str(e), exc_info=True)
+
+    @run_async
+    def download_sticker_animated_async(self, file_id, update=None, context=None):
+        if not update or not context:
+            return -1
+
+        # language
+        locale = update.effective_user.language_code
+        message = update.effective_message
+
+        try:
+            # parse update and context
+            bot = context.bot
+            sticker = bot.get_file(file_id)
+            sticker_pack_name = sticker.file_path.split('/')[-1].split('.')[0]
+            sticker_unique_id = random_string() # sticker.file_unique_id
+
+            callback = download_sticker_animated_pack
+            args = (sticker, sticker_pack_name)
+            self.base_send_zip(sticker_pack_name, callback, args,
+                            update=update, context=context, pack_name=sticker_unique_id)
+
+        except Exception as e:
+            message.reply_text(l10n('exec_error', locale))
+            self.logger.error('Exception msg: %s', str(e), exc_info=True)
+
+    def download_sticker_async(self, file_id, update=None, context=None):
+        if not update or not context:
+            return -1
+
+        # language
+        locale = update.effective_user.language_code
+
+        # parse update and context
+        bot = context.bot
+        sticker = bot.get_file(file_id)
+        sticker_name = sticker.file_path.split('/')[-1].split('.')[0]
+        sticker_unique_id = random_string() # sticker.file_unique_id
+
+        chat = update.effective_chat
+        message = update.effective_message
+
+        # send action
+        chat.send_action('upload_document')
+
+        # download sticker
+        file_dir = os.path.join(_temp_dir, sticker_name)
+        file_path = os.path.join(_temp_dir, sticker_name, sticker_name+'.png')
+        if os.path.isfile(file_path):
+            pass
+        elif os.path.isdir(file_dir):
+            # wait 10 times, 10 seconds for each
+            for _ in range(10):
+                if not os.path.isfile(file_path):
+                    time.sleep(10)
+                else:
+                    break
+            else:
+                message.reply_text(l10n('zip_timeout', locale))
+                return -1
+        else:
+            # make dir `sticker_name`
+            os.path.isdir(file_dir) or os.makedirs(file_dir)
+            _, file_path = download_sticker(sticker, save_dir=file_dir)
+
+        # send document
+        sticker_set_name = message.sticker.set_name
+        callback_data = ''.join([STICKER_SET, ':', sticker_set_name])
+        keyboard = InlineKeyboardMarkup(
+            [[
+                InlineKeyboardButton(text=l10n('kb_sticker_set', locale),
+                                    callback_data=callback_data),
+            ]]
+        )
+        with open(file_path, 'rb') as f:
+            chat.send_document(f, reply_markup=keyboard,
+                            filename=sticker_unique_id+'.png',
+                            reply_to_message_id=message.message_id)
+
+        # count usage
+        set_usage(context, file_path=file_path)
+
+
+    ''' command functions '''
 
     def cmd_start(self, update, context):
         ''''''
@@ -261,15 +288,15 @@ class BotExecutor():
         if update.effective_message.sticker.is_animated:
             update.effective_message.reply_text(l10n('unsupport', locale))
             # print(update.effective_message.sticker)
-            # download_sticker_animated_async(file_id, update=update, context=context)
+            # self.download_sticker_animated_async(file_id, update=update, context=context)
         else:
-            download_sticker_async(file_id, update=update, context=context)
+            self.download_sticker_async(file_id, update=update, context=context)
 
     @check_usage_limit
     def cmd_sticker_set(self, update, context):
         ''''''
         sticker_set_name = context.match.group('sticker_set')
-        download_sticker_set_async(sticker_set_name, update=update, context=context)
+        self.download_sticker_set_async(sticker_set_name, update=update, context=context)
 
     @check_usage_limit
     def callback_sticker_set(self, update, context):
@@ -283,16 +310,22 @@ class BotExecutor():
         # download or send
         callback_data = update.callback_query.data
         sticker_set_name = callback_data.split(':')[-1]
-        download_sticker_set_async(sticker_set_name, update=update, context=context)
+        self.download_sticker_set_async(sticker_set_name, update=update, context=context)
 
     @check_usage_limit
     def cmd_gif(self, update, context):
         ''''''
-        file_id = update.effective_message.document.file_id
-        download_gif_pack_async(file_id, update=update, context=context)
+        # language
+        locale = update.effective_user.language_code
 
-    @staticmethod
-    def error_handler(update, context):
+        file_id = update.effective_message.document.file_id
+        file_size = update.effective_message.document.file_size or 1.0e10
+        if file_size > self.gif_file_size_max:
+            update.effective_message.reply_text(l10n('file_size_exceed', locale))
+        else:
+            self.download_gif_pack_async(file_id, update=update, context=context)
+
+    def error_handler(self, update, context):
         ''''''
         self.logger.error('Exception msg: %s\nUpdate: %s', context.error, update)
 

@@ -25,11 +25,13 @@ _translation = {
 
 请尽情使用 :)''',
         'limit_exceed': '今日用量已超出 %(limit)s，请明天再试',
+        'kb_sticker_set': '下载完整贴纸集',
         'unsupport': '资源有限尚未支持，请自行下载转换',
         'zip_preparing': '正在准备文件，时间较长请稍等',
         'zip_packing': '等待文件打包，时间较长请稍等',
         'zip_timeout': '等待超时，请稍后重试',
-        'kb_sticker_set': '下载完整贴纸集',
+        'exec_error': '执行错误，请自行下载转换',
+        'file_size_exceed': '文件过大，请自行下载转换',
     },
 
     'en': {
@@ -55,11 +57,13 @@ _translation = {
 
 Hope you enjoy it :)''',
         'limit_exceed': 'Limit exceed %(limit)s today, try tomorrow',
+        'kb_sticker_set': 'Download Sticker Set',
         'unsupport': 'Resource limited, please download and decode by yourself',
         'zip_preparing': 'File preparing, hold on please',
         'zip_packing': 'File packing, hold on please',
         'zip_timeout': 'Timeout waiting, try again later',
-        'kb_sticker_set': 'Download Sticker Set',
+        'exec_error': 'Error executing, please download and decode by yourself',
+        'file_size_exceed': 'File too large, please download and decode by yourself',
     }
 }
 _translation_default = _translation['en']
@@ -67,6 +71,7 @@ _translation_default = _translation['en']
 
 def l10n(key, locale='en'):
     ''''''
+    locale = locale or 'en'
     locale = locale[:2] if len(locale) > 2 else locale
     document = _translation.get(locale, _translation_default)
     return document.get(key, key)

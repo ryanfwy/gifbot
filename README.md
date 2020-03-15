@@ -116,10 +116,19 @@ if __name__ == '__main__':
     BotExecutor().execute()
 ```
 
-
 #### 4) Run
 ```bash
 python3 main_run_bot.py
+```
+
+## Quick Installation
+
+Install on this way WON'T setup all the steps metioned above, such as webhook and bot entrance, but it can help you to install some basic environments quickly.
+
+**Notice**: `CentOS 7.4` required.
+
+```bash
+bash install_centos.sh
 ```
 
 ## Questions

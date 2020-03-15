@@ -14,12 +14,12 @@ sudo yum -y install ffmpeg ffmpeg-devel
 
 ffmpeg -version
 
-echo ">>> 3. repository"
+echo ">>> 3. setup repository"
 python3 -m venv .env
 source .env/bin/activate
 pip3 install -r requirements.txt
 
-echo ">>> 4. configuration"
+echo ">>> 4. setup configuration"
 read -p "Input your bot token: " token
 touch global_config/protected_config.py
 echo "_telegrambot_token = '$token'" > global_config/protected_config.py
@@ -31,4 +31,4 @@ read -p "Input your cache absolute location: " temp_dir
 echo "_temp_dir = '$temp_dir'" >> global_config/environment_config.py
 
 echo ">>> 5. setup entrance"
-echo "On more step to done, setup your bot entrance by yourself."
+echo "One more step to be done, setup your bot entrance by yourself."

@@ -7,7 +7,7 @@ dill==0.3.1.1
 future==0.18.2
 idna==2.8
 multiprocess==0.70.9
-numpy==1.18.1
+numpy==1.22.0
 pandas==1.0.1
 pathos==0.2.5
 Pillow==7.0.0
